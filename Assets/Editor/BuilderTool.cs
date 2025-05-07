@@ -5,11 +5,11 @@ using UnityEngine;
 public class BuilderTool : EditorWindow
 {
 
-    public LayerMask layerMask;
+    
     public Material previewMaterial;
 
     SerializedObject so;
-    SerializedProperty layerMaskProp;
+    
     SerializedProperty previewMaterialProp;
 
     List<GameObject> walls = new(), floors = new(), roofs = new();
@@ -24,10 +24,13 @@ public class BuilderTool : EditorWindow
 
     Mesh prefabMesh;
 
+    bool smallerCollision = false;
 
 
     Quaternion prefabRotation;
     bool canPlace;
+
+    Camera cam;
 
     [MenuItem("Tools/Builder Tool")]
     public static void OpenWindow() => GetWindow<BuilderTool>("Builder Tool");
@@ -36,7 +39,7 @@ public class BuilderTool : EditorWindow
     {
         prefabRotation = Quaternion.identity;
         so = new(this);
-        layerMaskProp = so.FindProperty("layerMask");
+        
         previewMaterialProp = so.FindProperty("previewMaterial");
 
         walls = GetPrefabs("Walls");
@@ -44,6 +47,8 @@ public class BuilderTool : EditorWindow
         roofs = GetPrefabs("Roofs");
 
         SceneView.duringSceneGui += DurinSceneGui;
+
+        
 
         if (EditorPrefs.HasKey("previewMaterial"))
             previewMaterial = AssetDatabase.LoadAssetAtPath<Material>(EditorPrefs.GetString("previewMaterial"));
@@ -58,6 +63,7 @@ public class BuilderTool : EditorWindow
 
     private void DurinSceneGui(SceneView view)
     {
+        cam = view.camera;
         RaycastHit hit;
 
         if (prefabMesh != null)
@@ -69,20 +75,26 @@ public class BuilderTool : EditorWindow
             //drawing the mesh
             previewMaterial.SetPass(0);
 
-            // calculate the center of the mesh drawn 
+            // set canPlace to true and the color to green but then if there's a collision canPlace turns false and the color is set to red
+            previewMaterial.SetColor("_BaseColor", Color.green);
+            canPlace = true;
+
+            smallerCollision = false;
+
+            // calculate the center of the mesh drawn acounting for the rotation
             Vector3 prefabCenter = mousePos + prefabRotation * prefabMesh.bounds.center;
             Handles.matrix = Matrix4x4.TRS(prefabCenter, prefabRotation, Vector3.one);
 
-            SnapCollisionCheck(prefabCenter);
+            smallerCollision = SnapCollisionCheck(prefabCenter);
             Graphics.DrawMeshNow(prefabMesh, mousePos, prefabRotation);
 
             CollisionCheck(mousePos + prefabRotation * prefabMesh.bounds.center);
 
-            //if (!buildingModuleChosen.Rules())
-            //{
-            //    canPlace = false;
-            //    previewMaterial.SetColor("_BaseColor", Color.red);
-            //}
+            if (!buildingModuleChosen.Rules(prefabCenter, prefabMesh, prefabRotation))
+            {
+                canPlace = false;
+                previewMaterial.SetColor("_BaseColor", Color.red);
+            }
 
             Placement();
 
@@ -108,41 +120,59 @@ public class BuilderTool : EditorWindow
 
             // registers it to the undo history
             Undo.RegisterCreatedObjectUndo(prefabGameObj, $"spawned {prefabGameObj.name}");
-
-            // reset parameters
-            chosenPrefab = null;
-            prefabMesh = null;
-            prefabGameObj = null;
+            ResetPrefab();
         }
+    }
+
+    private void ResetPrefab()
+    {
+        // reset parameters
+        chosenPrefab = null;
+        prefabMesh = null;
+        prefabGameObj = null;
     }
 
     private void CollisionCheck(Vector3 prefabCenter)
     {
+        float collisionMult = 1;
+        if (smallerCollision)
+            collisionMult = .89f;
+
         // check for collison with an overlap box around the mesh
-        Collider[] overlapedColliders = Physics.OverlapBox(prefabCenter, prefabMesh.bounds.extents*0.99f, prefabRotation);
+        Collider[] overlapedColliders = Physics.OverlapBox(prefabCenter, prefabMesh.bounds.extents * collisionMult, prefabRotation);
 
         // draw said overlap box
-        Handles.DrawWireCube(Vector3.zero, prefabMesh.bounds.extents * 1.99f);
+        Handles.DrawWireCube(Vector3.zero, prefabMesh.bounds.extents * (2 * collisionMult));
 
-        // set canPlace to true if there are no collision and false if there are
-        previewMaterial.SetColor("_BaseColor", Color.green);
-        canPlace = true;
-
-        if (overlapedColliders.Length > 1)
+        if (overlapedColliders.Length > 0)
         {
-            canPlace = false;
-            previewMaterial.SetColor("_BaseColor", Color.red);
+            int colliders = overlapedColliders.Length;
+            // ignore the collider of the pavement
+            foreach (Collider col in overlapedColliders)
+            {
+                if (!col.TryGetComponent(out IBuildingModule i))
+                {
+                    colliders--;
+                }
+            }
+
+            if (colliders > 0)
+            {
+                canPlace = false;
+                previewMaterial.SetColor("_BaseColor", Color.red);
+            }
+
         }
     }
 
     private bool SnapCollisionCheck(Vector3 prefabCenter)
     {
-        if(!Event.current.alt)
+        if (!Event.current.alt)
             return false;
 
-        Collider[] overlapedBuildings = Physics.OverlapBox(prefabCenter, prefabMesh.bounds.extents * 1.2f, prefabRotation);
+        Collider[] overlapedBuildings = Physics.OverlapBox(prefabCenter, prefabMesh.bounds.extents * 1.6f, prefabRotation);
         Handles.color = Color.blue;
-        Handles.DrawWireCube(Vector3.zero, prefabMesh.bounds.extents * 2.4f);
+        Handles.DrawWireCube(Vector3.zero, prefabMesh.bounds.extents * 3.2f);
 
         float distance = Mathf.Infinity;
         Collider nearestCollider = null;
@@ -160,7 +190,23 @@ public class BuilderTool : EditorWindow
 
         if (nearestCollider.TryGetComponent(out IBuildingModule buildingModule))
         {
-            mousePos = buildingModule.Snap(mousePos); // idk if i should use prefabCenter or mousePos
+            snappedPos = buildingModule.Snap(mousePos, prefabMesh, prefabRotation);
+            Vector3 dir = (prefabCenter - mousePos).normalized;
+            //if (dir != Vector3.zero)
+            //{
+            //    Vector3 forward = prefabRotation.normalized * Vector3.forward;
+            //    Vector3 right = prefabRotation.normalized * Vector3.right;
+            //    Vector3 up = prefabRotation.normalized * Vector3.up;
+
+            //    float dotForward = Vector3.Dot(dir, forward);
+            //    float dotRight = Vector3.Dot(dir, right);
+            //    float dotUp = Vector3.Dot(dir, up);
+
+            //    if (dotForward >= .7f || dotForward <= .7f)
+            //        dir *= prefabMesh.bounds.extents.z;
+
+            //}
+            mousePos = snappedPos + dir;
 
             return true;
         }
@@ -183,17 +229,18 @@ public class BuilderTool : EditorWindow
     private void OnGUI()
     {
         so.Update();
-        EditorGUILayout.PropertyField(layerMaskProp);
+        
         EditorGUILayout.PropertyField(previewMaterialProp);
         so.ApplyModifiedProperties();
-
-        var scrollViewScope = new EditorGUILayout.ScrollViewScope(scrollPos);
-        scrollPos = scrollViewScope.scrollPosition;
-
+        
         if (GUILayout.Button("ResetRotation"))
         {
             prefabRotation = Quaternion.identity;
         }
+
+        var scrollViewScope = new EditorGUILayout.ScrollViewScope(scrollPos);
+        scrollPos = scrollViewScope.scrollPosition;
+
 
         using (scrollViewScope)
         {
@@ -238,7 +285,7 @@ public class BuilderTool : EditorWindow
                 {
                     prefabMesh = prefab.GetComponent<MeshFilter>().sharedMesh;
                     chosenPrefab = prefab;
-                    if(!prefab.TryGetComponent(out buildingModuleChosen))
+                    if (!prefab.TryGetComponent(out buildingModuleChosen))
                     {
                         Debug.LogError("this prefab is not a building block plese add one of the scripts to this prefab or remove it from the folder", prefab);
                         chosenPrefab = null;

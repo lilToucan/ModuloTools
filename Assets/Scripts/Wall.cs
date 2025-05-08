@@ -5,9 +5,9 @@ using UnityEngine;
 public class Wall : BaseBuilding
 {
     
-    public override bool Rules(Vector3 center, Quaternion rotation)
+    public override bool Rules(Vector3 center, Mesh prefabMesh, Quaternion rotation)
     {
-        Collider[] overlapedColliders = Physics.OverlapBox(center, mesh.bounds.extents * 1.1f, rotation);
+        Collider[] overlapedColliders = Physics.OverlapBox(center, prefabMesh.bounds.extents * 1.1f, rotation);
 
         if (overlapedColliders.Length > 0)
         {

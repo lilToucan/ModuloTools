@@ -12,7 +12,7 @@ public class BaseBuilding : MonoBehaviour, IBuildingModule
         mesh = GetComponent<MeshFilter>().sharedMesh;
     }
 
-    public virtual bool Rules(Vector3 center, Quaternion rotation)
+    public virtual bool Rules(Vector3 center, Mesh prefabMesh, Quaternion rotation)
     {
         return false;
     }

@@ -5,7 +5,7 @@ using UnityEngine;
 public class BuilderTool : EditorWindow
 {
     public Material PreviewMaterial;
-    public float OffsetPower;
+    public float OffsetPower = 1;
 
     SerializedObject so;
     SerializedProperty previewMaterialProp, offsetPowerProp;
@@ -53,7 +53,7 @@ public class BuilderTool : EditorWindow
         parentGameobject.transform.position = Vector3.zero;
         parentGameobject.transform.rotation = Quaternion.identity;
 
-        
+
         if (EditorPrefs.HasKey("PreviewMaterial"))
             PreviewMaterial = AssetDatabase.LoadAssetAtPath<Material>(EditorPrefs.GetString("PreviewMaterial"));
 
@@ -61,7 +61,7 @@ public class BuilderTool : EditorWindow
         {
             savedHousesIndex = EditorPrefs.GetInt("savedHousesIndex");
         }
-       
+
     }
 
     private void OnDisable()
@@ -217,7 +217,7 @@ public class BuilderTool : EditorWindow
 
         if (overlapedBuildings.Length <= 0)
         {
-            
+
             return false;
         }
 
@@ -343,11 +343,18 @@ public class BuilderTool : EditorWindow
             case 3:
                 if (GUILayout.Button("SaveHouse"))
                 {
-                    PrefabUtility.SaveAsPrefabAsset( parentGameobject, AssetDatabase.GenerateUniqueAssetPath("Assets/prefabs/SavedHouses/" + parentGameobject.name+".prefab"), out var x);
+                    PrefabUtility.SaveAsPrefabAssetAndConnect(parentGameobject, AssetDatabase.GenerateUniqueAssetPath("Assets/prefabs/SavedHouses/" + parentGameobject.name + ".prefab"), InteractionMode.UserAction, out var x);
+
                     if (x)
+                    {
                         savedHousesIndex++;
+                        Destroy(parentGameobject);
+                        parentGameobject = new GameObject("SavedHouseN°" + savedHousesIndex);
+                        parentGameobject.transform.position = Vector3.zero;
+                        parentGameobject.transform.rotation = Quaternion.identity;
+                    }
                 }
-                SetUpSheet(savedHouses);
+                
                 break;
         }
     }

@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 public class Wall : BaseBuilding
 {
-    public override bool Rules(Vector3 center, Mesh mesh, Quaternion rotation)
+    
+    public override bool Rules(Vector3 center, Quaternion rotation)
     {
         Collider[] overlapedColliders = Physics.OverlapBox(center, mesh.bounds.extents * 1.1f, rotation);
 
@@ -24,50 +26,10 @@ public class Wall : BaseBuilding
         return false;
     }
 
-    public override Vector3 Snap(Vector3 centerPos, Mesh prefabMesh, Quaternion rotation)
+    public override (Vector3, Vector3) Snap(List<Vector3> snapGrid, Vector3 mousePos)
     {
-        Collider col = GetComponent<Collider>();
-        float posX;
-        float posY;
-        float posZ;
-        float distance = float.MaxValue;
-        Vector3 closestPos = centerPos;
-        Vector3 pos;
 
-        int max = 2;
-        int min = -2;
-
-
-        for (int x = min; x <= max; x++)
-        {
-            posX = col.bounds.center.x + (col.bounds.size.x / 3) * x;
-
-            for (int y = min; y <= max; y++)
-            {
-                posY = col.bounds.center.y + (col.bounds.size.y / 3) * y;
-
-                for (int z = min; z <= max; z++)
-                {
-                    if (x != min && x != max && y != min && y != max && z != max && z != min)
-                        continue;
-
-                    posZ = col.bounds.center.z + (col.bounds.size.z / 3) * z;
-                    pos = new(posX, posY, posZ);
-
-                    float dist = Vector3.Distance(pos, centerPos);
-
-                    if (dist < distance)
-                    {
-                        distance = dist;
-                        closestPos = pos;
-                    }
-
-                }
-            }
-        }
-
-        //pos = new(posX, posY, posZ);
-        return closestPos;
+       return base.Snap(snapGrid, mousePos);
     }
 
 #if UNITY_EDITOR
@@ -94,9 +56,8 @@ public class Wall : BaseBuilding
                 {
                     if (z == 0 && y == 0 && x == 0)
                         continue;
-
-                    
-                    
+                    if (z != 0 && (y != 0 || x != 0))
+                        continue;
 
                     posZ = col.bounds.center.z + (col.bounds.size.z / 3.5f) * z * 2;
                     pos = new(posX, posY, posZ);
@@ -105,6 +66,15 @@ public class Wall : BaseBuilding
                 }
             }
         }
+
+        if (closestPos == Vector3.zero && closestGirdPoint == Vector3.zero)
+            return;
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawSphere(closestPos, .1f);
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawSphere(closestGirdPoint, .1f);
     }
 #endif
 }

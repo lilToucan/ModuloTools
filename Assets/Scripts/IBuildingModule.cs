@@ -1,7 +1,8 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public interface IBuildingModule
 {
-    public bool Rules(Vector3 center, Mesh mesh, Quaternion rotation);
-    public Vector3 Snap(Vector3 mousePos, Mesh prefabMesh, Quaternion rotation);
+    public bool Rules(Vector3 center, Quaternion rotation);
+    public (Vector3,Vector3) Snap(List<Vector3> snapGrid, Vector3 mousePos);
 }

@@ -1,8 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Roof : BaseBuilding
 {
-    public override bool Rules(Vector3 center, Mesh mesh, Quaternion rotation)
+    public override bool Rules(Vector3 center, Quaternion rotation)
     {
         Collider[] overlapedColliders = Physics.OverlapBox(center, mesh.bounds.extents * 1.1f, rotation);
 
@@ -10,6 +11,9 @@ public class Roof : BaseBuilding
         {
             foreach (Collider col in overlapedColliders)
             {
+                if (col.TryGetComponent(out Floor floor))
+                    return false;
+
                 if (col.TryGetComponent(out Wall wall))
                 {
                     if (col.bounds.center.y < center.y)
@@ -22,36 +26,8 @@ public class Roof : BaseBuilding
         return false;
     }
 
-    public override Vector3 Snap(Vector3 mousePosition, Mesh prefabMesh, Quaternion rotation)
+    public override (Vector3, Vector3) Snap(List<Vector3> snapGrid, Vector3 mousePosition)
     {
-        mesh = GetComponent<MeshFilter>().sharedMesh;
-        Vector3 result = mousePosition;
-
-        Vector3 dir = (transform.position - mousePosition).normalized;
-        float dot = Vector3.Dot(-dir, transform.up);
-
-        // calculate bounds while accounting for rotation and scale 
-        float scaledHeight = mesh.bounds.max.y * transform.lossyScale.y;
-        float scaledWidth = mesh.bounds.extents.x * transform.lossyScale.x;
-
-        // snap Up
-        if (dot <= -.7f)
-        {
-            result = transform.position - transform.up * scaledHeight;
-        }
-        else
-        {
-            dot = Vector3.Dot(-dir, transform.right);
-
-            // snap right
-            if (dot >= .7f)
-                result = transform.position + transform.right * (scaledWidth * 2f);
-
-            // snap left
-            else if (dot <= -.7f)
-                result = transform.position - transform.right * (scaledWidth * 2f);
-        }
-
-        return result;
+        return base.Snap(snapGrid, mousePosition);
     }
 }

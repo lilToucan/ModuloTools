@@ -1,8 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Floor : BaseBuilding
 {
-    public override bool Rules(Vector3 center, Mesh mesh, Quaternion rotation)
+    public override bool Rules(Vector3 center, Quaternion rotation)
     {
         Collider[] overlapedColliders = Physics.OverlapBox(center, mesh.bounds.extents * 1.1f, rotation);
 
@@ -12,53 +13,17 @@ public class Floor : BaseBuilding
             {
                 if (col.TryGetComponent(out Roof roof))
                     return false;
-
-                if (col.TryGetComponent(out Floor floor))
-                {
-                    if (col.bounds.center.y > center.y || col.bounds.center.y < center.y)
-                        return false;
-                }
             }
 
+            
             return true;
         }
 
         return false;
     }
 
-    public override Vector3 Snap(Vector3 mousePosition, Mesh prefabMesh, Quaternion rotation)
+    public override (Vector3, Vector3) Snap(List<Vector3> snapGrid, Vector3 mousePosition)
     {
-        mesh = GetComponent<MeshFilter>().sharedMesh;
-        Vector3 result = mousePosition;
-
-        Vector3 dir = (transform.position - mousePosition).normalized;
-        float dot = Vector3.Dot(-dir, transform.right);
-
-        // calculate bounds while accounting for rotation and scale 
-        float scaledWidth = mesh.bounds.extents.x * transform.lossyScale.x;
-        float scaledDepth = mesh.bounds.extents.z * transform.lossyScale.z;
-
-        // snap right
-        if (dot >= .7f)
-            result = transform.position + transform.right * (scaledWidth * 2f);
-
-        // snap left
-        else if (dot <= -.7f)
-            result = transform.position - transform.right * (scaledWidth * 2f);
-
-        else
-        {
-            dot =  Vector3.Dot(-dir, transform.forward);
-
-            // snap front
-            if (dot >= .7f)
-                result = transform.position + transform.forward * (scaledDepth * 2f);
-
-            // snap back
-            else if (dot <= -.7f)
-                result = transform.position - transform.forward * (scaledDepth * 2f);
-
-        }
-            return result;
+        return base.Snap(snapGrid, mousePosition);
     }
 }
